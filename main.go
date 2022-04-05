@@ -36,12 +36,13 @@ type Dado struct {
 }
 
 func main() {
-
+   //momento de criar banco de dados
 	err := createDataBase()
 	if err != nil {
 		fmt.Println(err)
 	}
     fmt.Println("table DADOS is created")
+	//leitura do arquivo
 	readFile, err := os.Open("base_teste.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -67,7 +68,7 @@ func main() {
 			currentTime := time.Now()
 			currentTime,_ = time.Parse("2006-01-02",conteudo[3])
 			
-			
+			//cria uma lista do tipo dado
 			dado := Dado{conteudo[0], conteudo[1], conteudo[2], currentTime,
 					fMedio, fUltima, conteudo[6], conteudo[7]}
 			dados=append(dados,dado)
@@ -82,6 +83,7 @@ func main() {
 		}
 		
 	}
+	//envia para o banco a lista de dados
 	persistDados()
 	//fmt.Println(dados)
 }
@@ -90,6 +92,7 @@ func persistDados(){
 	//fmt.Println(dados)
 	start := time.Now()
 	fmt.Println(start)
+	//abre apenas uma conexao, para evitar a lentidao
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 	   "password=%s dbname=%s sslmode=disable",
 	   host, port, user, password, dbname)
@@ -98,11 +101,10 @@ func persistDados(){
 			panic(err)
 		}
 	for _, iDado := range dados {
-		//if (isValidCpf(iDado.CPF)) 
-		//   && ((iDado.LOJA_FREQUENCIA =="NULL") || (isValidCnpj(iDado.LOJA_FREQUENCIA))) 
-		 //  && ((iDado.ULTIMA_LOJA =="NULL") || (isValidCnpj(iDado.ULTIMA_LOJA))){
+		//verifica se os dados de cpf e cnpj estao corretos
 		bDadoValido:=isValidCpf(iDado.CPF) && ((iDado.LOJA_FREQUENCIA =="NULL") || (isValidCnpj(iDado.LOJA_FREQUENCIA))) && ((iDado.ULTIMA_LOJA =="NULL") || (isValidCnpj(iDado.ULTIMA_LOJA)))
 			if bDadoValido {
+		    //salva o dado no banco
 			persistDado(iDado,db)
 		}
 	}
@@ -112,6 +114,7 @@ func persistDados(){
 	fmt.Println(diff)
 }
 func persistDado(perDado Dado,db *sql.DB ) error {
+	//query que insere o dado no banco
 	qry, err := db.Prepare("INSERT INTO DADOS (CPF, PRIVATE, INCOMPLETO, DATA_COMPRA, TICKET_MEDIO, TICKET_ULTIMA, LOJA_FREQUENCIA, ULTIMA_LOJA) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)")
 	if err != nil {
 		panic(err)
@@ -125,6 +128,7 @@ func persistDado(perDado Dado,db *sql.DB ) error {
 }
 
 func createDataBase() error {
+	//funcao que cria o banco de dados
 	fmt.Println("connecting")
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
@@ -158,6 +162,7 @@ func createDataBase() error {
 }
 
 func isValidCpf(sCpf string) bool{
+	//regra validacao de cpf
 	sCpf = strings.ReplaceAll(sCpf,"-","")
 	sCpf = strings.ReplaceAll(sCpf,"/","")
 	sCpf = strings.ReplaceAll(sCpf,".","")
@@ -202,6 +207,7 @@ func isValidCpf(sCpf string) bool{
 }
 
 func isValidCnpj(sCnpj string) bool{
+	//regra validacao de cnpj
 	sCnpj = strings.ReplaceAll(sCnpj,"-","")
 	sCnpj = strings.ReplaceAll(sCnpj,"/","")
 	sCnpj = strings.ReplaceAll(sCnpj,".","")
