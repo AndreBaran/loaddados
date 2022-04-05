@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"math"
+	"sync"
 
 	_ "github.com/lib/pq"
 )
@@ -23,6 +24,8 @@ const (
 )
 
 var dados []Dado
+
+var wg sync.WaitGroup
 
 type Dado struct {
 	CPF             string  `json:"CPF"`
@@ -41,7 +44,6 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-    fmt.Println("table DADOS is created")
 	//leitura do arquivo
 	readFile, err := os.Open("base_teste.txt")
 	if err != nil {
@@ -71,14 +73,7 @@ func main() {
 			//cria uma lista do tipo dado
 			dado := Dado{conteudo[0], conteudo[1], conteudo[2], currentTime,
 					fMedio, fUltima, conteudo[6], conteudo[7]}
-			dados=append(dados,dado)
-			if i == 1 {
-				fmt.Println(conteudo)
-				fmt.Println(fMedio)
-				fmt.Println(fUltima)
-				
-				fmt.Println(dado)
-			}
+			dados=append(dados,dado)	
 		
 		}
 		
@@ -100,14 +95,36 @@ func persistDados(){
 		if err != nil {
 			panic(err)
 		}
-	for _, iDado := range dados {
-		//verifica se os dados de cpf e cnpj estao corretos
-		bDadoValido:=isValidCpf(iDado.CPF) && ((iDado.LOJA_FREQUENCIA =="NULL") || (isValidCnpj(iDado.LOJA_FREQUENCIA))) && ((iDado.ULTIMA_LOJA =="NULL") || (isValidCnpj(iDado.ULTIMA_LOJA)))
-			if bDadoValido {
-		    //salva o dado no banco
-			persistDado(iDado,db)
+		db.SetMaxOpenConns(len(dados))
+		
+	
+	fmt.Println("----------")
+	fmt.Println(len(dados))
+	fmt.Println("----------")
+	wg.Add(5)
+    //quebrando a massa de dados
+	//em 5 blocos para execucao paralera
+	//evitando demasiados acesso ao banco
+	//o qual bloquei
+    for i:=0;i<=4; i++ {
+		iniFor:=(i*10000)
+		endFor:=((i+1)*10000)
+		if (endFor>len(dados)) {
+			endFor=len(dados)
 		}
+		//go routine 
+		go func(){
+			for j:=iniFor;j<endFor; j++ {
+				//validacao cpf/cnpj				
+				bDadoValido:=isValidCpf(dados[j].CPF) && ((dados[j].LOJA_FREQUENCIA =="NULL") || (isValidCnpj(dados[j].LOJA_FREQUENCIA))) && ((dados[j].ULTIMA_LOJA =="NULL") || (isValidCnpj(dados[j].ULTIMA_LOJA)))
+					if bDadoValido {
+						persistDado(dados[j],db)
+					}
+			}			 
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 	db.Close()
 	final := time.Now()
 	diff := final.Sub(start)
@@ -115,16 +132,19 @@ func persistDados(){
 }
 func persistDado(perDado Dado,db *sql.DB ) error {
 	//query que insere o dado no banco
+	//defer wg.Done()
 	qry, err := db.Prepare("INSERT INTO DADOS (CPF, PRIVATE, INCOMPLETO, DATA_COMPRA, TICKET_MEDIO, TICKET_ULTIMA, LOJA_FREQUENCIA, ULTIMA_LOJA) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)")
 	if err != nil {
 		panic(err)
 	}
+	
 	_, err = qry.Exec(perDado.CPF,perDado.PRIVATE,perDado.INCOMPLETO ,perDado.DATA_COMPRA,perDado.TICKET_MEDIO ,perDado.TICKET_ULTIMA,perDado.LOJA_FREQUENCIA ,perDado.ULTIMA_LOJA)
 	if err != nil {
 		panic(err)
 	}
+	
 	return nil
-
+	
 }
 
 func createDataBase() error {
