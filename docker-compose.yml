@@ -1,30 +1,27 @@
 # Specify the version for docker-compose.yml
-version: "3.3"
-
+version: '3.8'
 
 services:
   postgres:
-    container_name: postgres
+    container_name: pg_db
     image: postgres:latest
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB_NAME: desafio
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB_NAME: postgres
       # Optional: Give a name to the database, otherwise
       # use the default value POSTGRES_USER as a database name (user in this case.)
       # POSTGRES_DB: testdb
     ports:
       - "5432:5432"
-    volumes: 
-      - dbdata:/var/lib/postgresql/data
+    volumes:
+      - ./scripts/init_tables.sql:/docker-entrypoint-initdb.d/10-init_tables.sql
 
   go:
-    container_name: go
+    container_name: golang
     # build the Dockerfile, alternatively use an image.
     build:
       context: .
+      dockerfile: Dockerfile
     depends_on:
       - "postgres"
-
-volumes:
-  dbdata: # create the volume for persisting data.
